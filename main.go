@@ -562,6 +562,7 @@ func (c *controller) sync(ctx context.Context) {
 	}
 
 	hostNames := make(map[string][]string)
+
 	for _, obj := range c.endInf.GetStore().List() {
 		end, endpointsok := obj.(*corev1.Endpoints)
 
