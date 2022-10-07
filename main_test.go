@@ -23,6 +23,7 @@ func intPointer(i int32) *int32 {
 }
 
 // nolint:funlen
+// nolint:maintidx
 func TestController(t *testing.T) {
 	ctx := context.Background()
 	port := 10901

@@ -559,22 +559,25 @@ func (c *controller) sync(ctx context.Context) {
 		statefulsets[hashring] = sts.DeepCopy()
 
 		time.Sleep(c.options.scaleTimeout)
-
 	}
 
 	hostNames := make(map[string][]string)
-
 	for _, obj := range c.endInf.GetStore().List() {
-		end := obj.(*corev1.Endpoints)
+		end, endpointsok := obj.(*corev1.Endpoints)
+
+		if !endpointsok {
+			continue
+		}
+
 		hashring, ok := end.ObjectMeta.Labels[hashringLabelKey]
 
 		if !ok {
 			continue
 		}
+
 		for _, obj := range end.Subsets[0].Addresses {
 			hostNames[hashring] = append(hostNames[hashring], obj.Hostname)
 		}
-
 	}
 
 	c.populate(hashrings, statefulsets, hostNames)
