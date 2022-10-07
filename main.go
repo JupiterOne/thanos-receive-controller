@@ -324,6 +324,7 @@ type controller struct {
 	klient  kubernetes.Interface
 	cmapInf cache.SharedIndexInformer
 	ssetInf cache.SharedIndexInformer
+	endInf  cache.SharedIndexInformer
 
 	reconcileAttempts                 prometheus.Counter
 	reconcileErrors                   *prometheus.CounterVec
@@ -350,6 +351,9 @@ func newController(klient kubernetes.Interface, logger log.Logger, o *options) *
 		klient:  klient,
 		cmapInf: coreinformers.NewConfigMapInformer(klient, o.namespace, resyncPeriod, nil),
 		ssetInf: appsinformers.NewFilteredStatefulSetInformer(klient, o.namespace, resyncPeriod, nil, func(lo *metav1.ListOptions) {
+			lo.LabelSelector = labels.Set{o.labelKey: o.labelValue}.String()
+		}),
+		endInf: coreinformers.NewFilteredEndpointsInformer(klient, o.namespace, resyncPeriod, nil, func(lo *metav1.ListOptions) {
 			lo.LabelSelector = labels.Set{o.labelKey: o.labelValue}.String()
 		}),
 
@@ -429,6 +433,7 @@ func (c *controller) run(ctx context.Context, stop <-chan struct{}) error {
 
 	go c.cmapInf.Run(stop)
 	go c.ssetInf.Run(stop)
+	go c.endInf.Run(stop)
 
 	if err := c.waitForCacheSync(stop); err != nil {
 		return err
@@ -440,6 +445,11 @@ func (c *controller) run(ctx context.Context, stop <-chan struct{}) error {
 		UpdateFunc: func(_, _ interface{}) { c.queue.add() },
 	})
 	c.ssetInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(_ interface{}) { c.queue.add() },
+		DeleteFunc: func(_ interface{}) { c.queue.add() },
+		UpdateFunc: func(_, _ interface{}) { c.queue.add() },
+	})
+	c.endInf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(_ interface{}) { c.queue.add() },
 		DeleteFunc: func(_ interface{}) { c.queue.add() },
 		UpdateFunc: func(_, _ interface{}) { c.queue.add() },
@@ -491,7 +501,7 @@ func (c *controller) worker(ctx context.Context) {
 }
 
 //nolint:cyclop
-// //nolint:godox TODO(pgough) - linter is complaining about complexity because 13 (this) > 10 (default)
+//nolint:godox TODO(pgough) - linter is complaining about complexity because 13 (this) > 10 (default)
 func (c *controller) sync(ctx context.Context) {
 	c.reconcileAttempts.Inc()
 	configMap, ok, err := c.cmapInf.GetStore().GetByKey(fmt.Sprintf("%s/%s", c.options.namespace, c.options.configMapName))
@@ -548,10 +558,24 @@ func (c *controller) sync(ctx context.Context) {
 		c.replicas[hashring] = *sts.Spec.Replicas
 		statefulsets[hashring] = sts.DeepCopy()
 
-		time.Sleep(c.options.scaleTimeout) // Give some time for all replicas before they receive hundreds req/s
 	}
 
-	c.populate(hashrings, statefulsets)
+	hostNames := make(map[string][]string)
+
+	for _, obj := range c.endInf.GetStore().List() {
+		end := obj.(*corev1.Endpoints)
+		hashring, ok := end.ObjectMeta.Labels[hashringLabelKey]
+
+		if !ok {
+			continue
+		}
+		for _, obj := range end.Subsets[0].Addresses {
+			hostNames[hashring] = append(hostNames[hashring], obj.Hostname)
+		}
+
+	}
+
+	c.populate(hashrings, statefulsets, hostNames)
 
 	if err := c.saveHashring(ctx, hashrings, cm); err != nil {
 		c.reconcileErrors.WithLabelValues(save).Inc()
@@ -586,28 +610,30 @@ func (c controller) waitForPod(ctx context.Context, name string) error {
 }
 
 //nolint:nestif
-func (c *controller) populate(hashrings []receive.HashringConfig, statefulsets map[string]*appsv1.StatefulSet) {
+func (c *controller) populate(hashrings []receive.HashringConfig, statefulsets map[string]*appsv1.StatefulSet, hostNames map[string][]string) {
 	for i, h := range hashrings {
 		if sts, exists := statefulsets[h.Hashring]; exists {
 			var endpoints []string
 
-			for i := 0; i < int(*sts.Spec.Replicas); i++ {
+			for _, hostName := range hostNames[h.Hashring] {
 				// If cluster domain is empty string we don't want dot after svc.
 				clusterDomain := ""
 				if c.options.clusterDomain != "" {
 					clusterDomain = fmt.Sprintf(".%s", c.options.clusterDomain)
 				}
 
-				endpoints = append(endpoints,
-					fmt.Sprintf("%s-%d.%s.%s.svc%s:%d",
-						sts.Name,
-						i,
-						sts.Spec.ServiceName,
-						c.options.namespace,
-						clusterDomain,
-						c.options.port,
-					),
-				)
+				if hostName != "" {
+					endpoints = append(endpoints,
+						fmt.Sprintf("%s.%s.%s.svc%s:%d",
+							hostName,
+							sts.Spec.ServiceName,
+							c.options.namespace,
+							clusterDomain,
+							c.options.port,
+						),
+					)
+				}
+				
 			}
 
 			hashrings[i].Endpoints = endpoints
