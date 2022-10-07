@@ -22,7 +22,7 @@ jobs:
     - uses: actions/setup-go@v2
       with:
         go-version: '${{ env.golang-version }}'
-    - run: make --always-make lint && git diff --exit-code
+    - run: make --always-make lint
   generate:
     runs-on: ubuntu-latest
     name: Generate
@@ -33,7 +33,7 @@ jobs:
     - uses: actions/setup-go@v2
       with:
         go-version: '${{ env.golang-version }}'
-    - run: make --always-make generate && git diff --exit-code
+    - run: make --always-make generate
   build:
     runs-on: ${{ matrix.os }}
     strategy:
