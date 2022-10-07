@@ -96,22 +96,25 @@ func TestController(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "hashring0",
-						Labels: map[string]string{"a": "b"},
+						Labels: map[string]string{"a": "b", hashringLabelKey: "hashring0"},
 					},
 					Subsets: []corev1.EndpointSubset{
 						{
 							Addresses: []corev1.EndpointAddress{
 								{
 									IP:       "10.42.111.208",
-									NodeName: pointer.StringPtr("thanos-receive-hashring0-0"),
+									Hostname: "thanos-receive-hashring0-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
 								},
 								{
 									IP:       "10.42.139.1",
-									NodeName: pointer.StringPtr("thanos-receive-hashring0-1"),
+									Hostname: "thanos-receive-hashring0-1",
+									NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
 								},
 								{
 									IP:       "10.42.160.100",
-									NodeName: pointer.StringPtr("thanos-receive-hashring0-2"),
+									Hostname: "thanos-receive-hashring0-2",
+									NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
 								},
 							},
 							Ports: []corev1.EndpointPort{
@@ -123,11 +126,6 @@ func TestController(t *testing.T) {
 								{
 									Name:     "grpc",
 									Port:     10901,
-									Protocol: "TCP",
-								},
-								{
-									Name:     "remote",
-									Port:     19291,
 									Protocol: "TCP",
 								},
 							},
@@ -177,6 +175,92 @@ func TestController(t *testing.T) {
 					Spec: appsv1.StatefulSetSpec{
 						Replicas:    intPointer(123),
 						ServiceName: "h123",
+					},
+				},
+			},
+			endpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hashring0",
+						Labels: map[string]string{
+							"a":              "b",
+							hashringLabelKey: "hashring0",
+						},
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "10.42.111.208",
+									Hostname: "hashring0-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
+								},
+								{
+									IP:       "10.42.139.1",
+									Hostname: "hashring0-1",
+									NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
+								},
+								{
+									IP:       "10.42.160.100",
+									Hostname: "hashring0-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "http",
+									Port:     10902,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "grpc",
+									Port:     10901,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hashring123",
+						Labels: map[string]string{
+							"a":              "b",
+							hashringLabelKey: "hashring123",
+						},
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "10.42.111.208",
+									Hostname: "hashring0-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
+								},
+								{
+									IP:       "10.42.139.1",
+									Hostname: "hashring0-1",
+									NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
+								},
+								{
+									IP:       "10.42.160.100",
+									Hostname: "hashring0-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "http",
+									Port:     10902,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "grpc",
+									Port:     10901,
+									Protocol: "TCP",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -282,6 +366,7 @@ func TestController(t *testing.T) {
 		statefulsets := tt.statefulsets
 		expected := tt.expected
 		clusterDomain := tt.clusterDomain
+		endpoints := tt.endpoints
 
 		t.Run(name, func(t *testing.T) {
 			opts := &options{
@@ -299,7 +384,7 @@ func TestController(t *testing.T) {
 			cleanUp := setupController(ctx, t, klient, opts)
 			defer cleanUp()
 
-			_ = createInitialResources(ctx, t, klient, opts, hashrings, statefulsets)
+			_ = createInitialResources(ctx, t, klient, opts, hashrings, statefulsets, endpoints)
 
 			// Reconciliation is async, so we need to wait a bit.
 			<-time.After(reconciliationDelay)
@@ -314,7 +399,7 @@ func TestController(t *testing.T) {
 			}
 
 			if cm.Data[opts.fileName] != string(buf) {
-				t.Errorf("the expected config does not match the actual config\ncase:\t%q\ngiven:\t%+v\nexpected:\t%+v\n", name, cm.Data[opts.fileName], string(buf))
+				t.Errorf("the expected config does not match the actual config\ncase:\t%q\nactual:\t%+v\nexpected:\t%+v\n", name, cm.Data[opts.fileName], string(buf))
 			}
 		})
 	}
@@ -393,6 +478,46 @@ func TestControllerConfigmapUpdate(t *testing.T) {
 							ServiceName: "h0",
 						},
 					},
+				}, []*corev1.Endpoints{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:   "hashring0",
+							Labels: map[string]string{"a": "b"},
+						},
+						Subsets: []corev1.EndpointSubset{
+							{
+								Addresses: []corev1.EndpointAddress{
+									{
+										IP:       "10.42.111.208",
+										Hostname: "thanos-receive-hashring0-0",
+										NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
+									},
+									{
+										IP:       "10.42.139.1",
+										Hostname: "thanos-receive-hashring0-1",
+										NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
+									},
+									{
+										IP:       "10.42.160.100",
+										Hostname: "thanos-receive-hashring0-2",
+										NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
+									},
+								},
+								Ports: []corev1.EndpointPort{
+									{
+										Name:     "http",
+										Port:     10902,
+										Protocol: "TCP",
+									},
+									{
+										Name:     "grpc",
+										Port:     10901,
+										Protocol: "TCP",
+									},
+								},
+							},
+						},
+					},
 				})
 
 			buf, err := json.Marshal(hashrings)
@@ -463,6 +588,7 @@ func createInitialResources(
 	opts *options,
 	hashrings []receive.HashringConfig,
 	statefulsets []*appsv1.StatefulSet,
+	endpoints []*corev1.Endpoints,
 ) *corev1.ConfigMap {
 	t.Helper()
 
@@ -487,6 +613,12 @@ func createInitialResources(
 	for _, sts := range statefulsets {
 		if _, err := klient.AppsV1().StatefulSets(opts.namespace).Create(ctx, sts, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("got unexpected error creating StatefulSet: %v", err)
+		}
+	}
+
+	for _, end := range endpoints {
+		if _, err := klient.CoreV1().Endpoints(opts.namespace).Create(ctx, end, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("got unexpected error creating Endpoints: %v", err)
 		}
 	}
 
