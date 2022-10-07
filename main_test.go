@@ -603,8 +603,11 @@ func TestControllerConfigmapUpdate(t *testing.T) {
 				}, []*corev1.Endpoints{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:   "hashring0",
-							Labels: map[string]string{"a": "b"},
+							Name: "hashring0",
+							Labels: map[string]string{
+								"a":              "b",
+								hashringLabelKey: "hashring0",
+							},
 						},
 						Subsets: []corev1.EndpointSubset{
 							{
