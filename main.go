@@ -633,7 +633,6 @@ func (c *controller) populate(hashrings []receive.HashringConfig, statefulsets m
 						),
 					)
 				}
-				
 			}
 
 			hashrings[i].Endpoints = endpoints
