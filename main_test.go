@@ -202,7 +202,7 @@ func TestController(t *testing.T) {
 								},
 								{
 									IP:       "10.42.160.100",
-									Hostname: "hashring0-0",
+									Hostname: "hashring0-2",
 									NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
 								},
 							},
@@ -311,6 +311,87 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
+			endpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hashring0",
+						Labels: map[string]string{
+							"a":              "b",
+							hashringLabelKey: "hashring0",
+						},
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "10.42.111.208",
+									Hostname: "hashring0-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
+								},
+								{
+									IP:       "10.42.139.1",
+									Hostname: "hashring0-1",
+									NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
+								},
+								{
+									IP:       "10.42.160.100",
+									Hostname: "hashring0-2",
+									NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "http",
+									Port:     10902,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "grpc",
+									Port:     10901,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hashring1",
+						Labels: map[string]string{
+							"a":              "b",
+							hashringLabelKey: "hashring1",
+						},
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "10.42.111.208",
+									Hostname: "hashring1-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
+								},
+								{
+									IP:       "10.42.139.1",
+									Hostname: "hashring1-1",
+									NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "http",
+									Port:     10902,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "grpc",
+									Port:     10901,
+									Protocol: "TCP",
+								},
+							},
+						},
+					},
+				},
+			},
 			clusterDomain: "cluster.local",
 			expected: []receive.HashringConfig{{
 				Hashring: "hashring0",
@@ -347,6 +428,47 @@ func TestController(t *testing.T) {
 					Spec: appsv1.StatefulSetSpec{
 						Replicas:    intPointer(3),
 						ServiceName: "h0",
+					},
+				},
+			},
+			endpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "hashring1",
+						Labels: map[string]string{"a": "b", hashringLabelKey: "hashring1"},
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "10.42.111.208",
+									Hostname: "thanos-receive-hashring1-0",
+									NodeName: pointer.StringPtr("ip-10.42.111.208.local"),
+								},
+								{
+									IP:       "10.42.139.1",
+									Hostname: "thanos-receive-hashring1-1",
+									NodeName: pointer.StringPtr("ip-10.42.111.209.local"),
+								},
+								{
+									IP:       "10.42.160.100",
+									Hostname: "thanos-receive-hashring1-2",
+									NodeName: pointer.StringPtr("ip-10.42.111.210.local"),
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "http",
+									Port:     10902,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "grpc",
+									Port:     10901,
+									Protocol: "TCP",
+								},
+							},
+						},
 					},
 				},
 			},

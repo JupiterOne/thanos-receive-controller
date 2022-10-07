@@ -558,6 +558,8 @@ func (c *controller) sync(ctx context.Context) {
 		c.replicas[hashring] = *sts.Spec.Replicas
 		statefulsets[hashring] = sts.DeepCopy()
 
+		time.Sleep(c.options.scaleTimeout)
+
 	}
 
 	hostNames := make(map[string][]string)
