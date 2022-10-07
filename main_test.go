@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/pointer"
 )
 
 const reconciliationDelay = 500 * time.Millisecond
@@ -30,6 +31,7 @@ func TestController(t *testing.T) {
 		name          string
 		hashrings     []receive.HashringConfig
 		statefulsets  []*appsv1.StatefulSet
+		endpoints     []*corev1.Endpoints
 		clusterDomain string
 		expected      []receive.HashringConfig
 	}{
@@ -87,6 +89,49 @@ func TestController(t *testing.T) {
 					Spec: appsv1.StatefulSetSpec{
 						Replicas:    intPointer(3),
 						ServiceName: "h0",
+					},
+				},
+			},
+			endpoints: []*corev1.Endpoints{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "hashring0",
+						Labels: map[string]string{"a": "b"},
+					},
+					Subsets: []corev1.EndpointSubset{
+						{
+							Addresses: []corev1.EndpointAddress{
+								{
+									IP:       "10.42.111.208",
+									NodeName: pointer.StringPtr("thanos-receive-hashring0-0"),
+								},
+								{
+									IP:       "10.42.139.1",
+									NodeName: pointer.StringPtr("thanos-receive-hashring0-1"),
+								},
+								{
+									IP:       "10.42.160.100",
+									NodeName: pointer.StringPtr("thanos-receive-hashring0-2"),
+								},
+							},
+							Ports: []corev1.EndpointPort{
+								{
+									Name:     "http",
+									Port:     10902,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "grpc",
+									Port:     10901,
+									Protocol: "TCP",
+								},
+								{
+									Name:     "remote",
+									Port:     19291,
+									Protocol: "TCP",
+								},
+							},
+						},
 					},
 				},
 			},
