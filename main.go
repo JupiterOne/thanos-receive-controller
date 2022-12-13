@@ -576,8 +576,10 @@ func (c *controller) sync(ctx context.Context) {
 			continue
 		}
 
-		for _, obj := range end.Subsets[0].Addresses {
-			hostNames[hashring] = append(hostNames[hashring], obj.Hostname)
+		if len(end.Subsets) > 0 {
+			for _, obj := range end.Subsets[0].Addresses {
+				hostNames[hashring] = append(hostNames[hashring], obj.Hostname)
+			}
 		}
 	}
 

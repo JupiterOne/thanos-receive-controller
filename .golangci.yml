@@ -26,6 +26,7 @@ linters:
   - ireturn
   - varnamelen
   - paralleltest
+  - gocognit
 
 linters-settings:
   errcheck:
